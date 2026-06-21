@@ -1,0 +1,27 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ─── covers/ — Public read (marketing thumbnails) ──────────────────────
+    // Cover images are safe to expose; they're just promotional thumbnails.
+    match /covers/{fileName} {
+      allow read: if true;
+      // Only server (Admin SDK) writes covers — block client writes
+      allow write: if false;
+    }
+
+    // ─── notes/ — PRIVATE (actual PDF content) ────────────────────────────
+    // PDF files are NEVER publicly accessible.
+    // They are only accessed via the Admin SDK in /api/pdf/[purchaseId].
+    // Even authenticated users cannot directly read from this path.
+    // This ensures the storage URL can never be extracted from the client.
+    match /notes/{fileName} {
+      allow read, write: if false;
+    }
+
+    // ─── Default deny ─────────────────────────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
