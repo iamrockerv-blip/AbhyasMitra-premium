@@ -9,11 +9,10 @@ import {
   Library,
   LogIn,
   LogOut,
-  User,
   Menu,
   X,
   ChevronDown,
-  Sparkles,
+  Settings,
 } from "lucide-react";
 import { auth } from "@/lib/firebase/client";
 import { signOut, onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
@@ -153,6 +152,14 @@ export default function Navbar() {
                           >
                             <Library className="w-4 h-4" />
                             My Library
+                          </Link>
+                          <Link
+                            href="/admin"
+                            onClick={() => setUserMenuOpen(false)}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
+                          >
+                            <Settings className="w-4 h-4" />
+                            Admin Panel
                           </Link>
                           <button
                             onClick={handleSignOut}

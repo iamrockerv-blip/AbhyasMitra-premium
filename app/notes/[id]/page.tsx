@@ -303,7 +303,7 @@ export default function NoteDetailPage() {
                 <span className="text-xs text-gray-500">{product.branch}</span>
                 <span className="text-xs text-gray-500">Semester {product.semester}</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight mb-4">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight mb-4">
                 {product.title}
               </h1>
               <p className="text-gray-400 text-base leading-relaxed">
@@ -312,7 +312,7 @@ export default function NoteDetailPage() {
             </motion.div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               {[
                 { label: "Pages", value: `${product.pageCount || "—"}` },
                 { label: "Semester", value: `Sem ${product.semester}` },
@@ -322,7 +322,7 @@ export default function NoteDetailPage() {
                   key={stat.label}
                   className="glass border border-white/8 rounded-2xl p-4 text-center"
                 >
-                  <div className="text-xl font-bold text-white mb-1">{stat.value}</div>
+                  <div className="text-lg sm:text-xl font-bold text-white mb-1">{stat.value}</div>
                   <div className="text-xs text-gray-500 uppercase tracking-wider">{stat.label}</div>
                 </div>
               ))}
@@ -368,7 +368,7 @@ export default function NoteDetailPage() {
               className="sticky top-28 glass border border-white/10 rounded-3xl p-8 shadow-card"
             >
               {/* Cover Preview */}
-              <div className="relative h-56 rounded-2xl overflow-hidden bg-dark-700 mb-6">
+              <div className="relative h-40 sm:h-56 rounded-2xl overflow-hidden bg-dark-700 mb-6">
                 {product.coverUrl ? (
                   <Image
                     src={product.coverUrl}
@@ -394,9 +394,9 @@ export default function NoteDetailPage() {
               </div>
 
               {/* Price */}
-              <div className="flex items-baseline gap-1 mb-6">
+              <div className="flex items-baseline gap-1 mb-4 sm:mb-6">
                 <IndianRupee className="w-6 h-6 text-primary-400 self-start mt-1" />
-                <span className="text-5xl font-black text-white">{product.price}</span>
+                <span className="text-4xl sm:text-5xl font-black text-white">{product.price}</span>
                 <span className="text-gray-500 ml-1">one-time</span>
               </div>
 

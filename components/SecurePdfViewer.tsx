@@ -39,8 +39,11 @@ import {
   ZoomIn,
   ZoomOut,
   BookOpen,
+  Maximize,
+  ArrowLeft,
 } from "lucide-react";
 import * as pdfjsLib from "pdfjs-dist";
+import Link from "next/link";
 
 // Set worker path — use local copy served from public folder
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
@@ -54,15 +57,54 @@ export default function SecurePdfViewer({ purchaseId, userEmail }: SecurePdfView
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [scale, setScale] = useState(1.4);
+  const [scale, setScale] = useState(1.0);
+  const [fitScale, setFitScale] = useState(1.0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [devToolsOpen, setDevToolsOpen] = useState(false);
+  const [pageInputValue, setPageInputValue] = useState("1");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<pdfjsLib.RenderTask | null>(null);
   const userRef = useRef<User | null>(null);
+
+  // Touch handling refs
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const isSwiping = useRef(false);
+
+  // ─── Calculate fit-to-width scale ─────────────────────────────────────────
+  const calculateFitScale = useCallback(async () => {
+    if (!pdfDoc || !scrollContainerRef.current) return;
+    try {
+      const page = await pdfDoc.getPage(currentPage);
+      const viewport = page.getViewport({ scale: 1.0 });
+      const containerWidth = scrollContainerRef.current.clientWidth - 32; // 16px padding each side
+      const newFitScale = containerWidth / viewport.width;
+      setFitScale(newFitScale);
+      return newFitScale;
+    } catch {
+      return 1.0;
+    }
+  }, [pdfDoc, currentPage]);
+
+  // Recalculate fit scale on resize
+  useEffect(() => {
+    const handleResize = () => {
+      calculateFitScale();
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [calculateFitScale]);
+
+  // Set initial scale once fit scale is calculated
+  useEffect(() => {
+    if (fitScale > 0 && loading === false && scale === 1.0) {
+      setScale(fitScale);
+    }
+  }, [fitScale, loading]);
 
   // ─── Dev-tools detection heuristic ────────────────────────────────────────
   // Compares window.outerWidth vs window.innerWidth; when dev-tools are open
@@ -126,6 +168,55 @@ export default function SecurePdfViewer({ purchaseId, userEmail }: SecurePdfView
     return () => container?.removeEventListener("contextmenu", handleContextMenu);
   }, []);
 
+  // ─── Touch swipe for page navigation ─────────────────────────────────────
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+      isSwiping.current = false;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
+      const dy = Math.abs(e.touches[0].clientY - touchStartY.current);
+      // Only treat as horizontal swipe if horizontal movement > vertical
+      if (dx > dy && dx > 30) {
+        isSwiping.current = true;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!isSwiping.current) return;
+      const touchEndX = e.changedTouches[0].clientX;
+      const dx = touchEndX - touchStartX.current;
+      const threshold = 60;
+
+      if (dx < -threshold) {
+        // Swipe left → next page
+        setCurrentPage((p) => Math.min(p + 1, totalPages));
+      } else if (dx > threshold) {
+        // Swipe right → previous page
+        setCurrentPage((p) => Math.max(p - 1, 1));
+      }
+      isSwiping.current = false;
+    };
+
+    container.addEventListener("touchstart", handleTouchStart, { passive: true });
+    container.addEventListener("touchmove", handleTouchMove, { passive: true });
+    container.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [totalPages]);
+
   // ─── Auth + PDF fetch ─────────────────────────────────────────────────────
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -169,6 +260,15 @@ export default function SecurePdfViewer({ purchaseId, userEmail }: SecurePdfView
     });
     return unsub;
   }, [purchaseId]);
+
+  // ─── Calculate fit scale when PDF is loaded ───────────────────────────────
+  useEffect(() => {
+    if (pdfDoc) {
+      calculateFitScale().then((fs) => {
+        if (fs) setScale(fs);
+      });
+    }
+  }, [pdfDoc, calculateFitScale]);
 
   // ─── Draw watermark on canvas ────────────────────────────────────────────
   const drawWatermark = useCallback(
@@ -240,6 +340,11 @@ export default function SecurePdfViewer({ purchaseId, userEmail }: SecurePdfView
     });
   }, [pdfDoc, currentPage, scale, drawWatermark]);
 
+  // ─── Sync page input value ───────────────────────────────────────────────
+  useEffect(() => {
+    setPageInputValue(String(currentPage));
+  }, [currentPage]);
+
   // ─── Keyboard page navigation (accessibility preserved) ───────────────────
   useEffect(() => {
     const handleNav = (e: KeyboardEvent) => {
@@ -253,6 +358,21 @@ export default function SecurePdfViewer({ purchaseId, userEmail }: SecurePdfView
     document.addEventListener("keydown", handleNav);
     return () => document.removeEventListener("keydown", handleNav);
   }, [totalPages]);
+
+  // ─── Handlers ────────────────────────────────────────────────────────────
+  const handleFitWidth = () => {
+    setScale(fitScale);
+  };
+
+  const handlePageInput = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseInt(pageInputValue);
+    if (!isNaN(val) && val >= 1 && val <= totalPages) {
+      setCurrentPage(val);
+    } else {
+      setPageInputValue(String(currentPage));
+    }
+  };
 
   // ─── Render ───────────────────────────────────────────────────────────────
   if (loading) {
@@ -283,97 +403,139 @@ export default function SecurePdfViewer({ purchaseId, userEmail }: SecurePdfView
   return (
     <div
       ref={containerRef}
-      className="pdf-viewer-container flex flex-col min-h-screen bg-dark-950"
+      className="pdf-viewer-container flex flex-col h-screen bg-dark-950"
     >
-      {/* Top controls */}
-      <div className="sticky top-0 z-10 glass border-b border-white/5 px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary-500/10 flex items-center justify-center">
-            <BookOpen className="w-4 h-4 text-primary-400" />
+      {/* Top controls — responsive */}
+      <div className="sticky top-0 z-10 glass border-b border-white/5 px-3 sm:px-4 py-2 sm:py-3">
+        {/* Row 1: Logo + title + back */}
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Link
+              href="/library"
+              className="flex-shrink-0 p-1.5 sm:p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
+              aria-label="Back to library"
+              id="pdf-back-btn"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Link>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary-500/10 flex items-center justify-center flex-shrink-0">
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-400" />
+            </div>
+            <span className="text-xs sm:text-sm font-medium text-gray-300 truncate">
+              <span className="hidden sm:inline">AbhyasMitra Premium — </span>Secure Viewer
+            </span>
           </div>
-          <span className="text-sm font-medium text-gray-300 hidden sm:block">
-            AbhyasMitra Premium — Secure Viewer
-          </span>
+
+          {/* Zoom controls — always visible */}
+          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+            <button
+              onClick={() => setScale((s) => Math.max(s - 0.2, 0.4))}
+              className="p-1.5 sm:p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
+              aria-label="Zoom out"
+              id="pdf-zoom-out"
+            >
+              <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+            <span className="text-[10px] sm:text-xs text-gray-500 w-8 sm:w-12 text-center">
+              {Math.round(scale * 100)}%
+            </span>
+            <button
+              onClick={() => setScale((s) => Math.min(s + 0.2, 3.0))}
+              className="p-1.5 sm:p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
+              aria-label="Zoom in"
+              id="pdf-zoom-in"
+            >
+              <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+            <button
+              onClick={handleFitWidth}
+              className="p-1.5 sm:p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
+              aria-label="Fit to width"
+              title="Fit to width"
+              id="pdf-fit-width"
+            >
+              <Maximize className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Page navigation */}
-        <div className="flex items-center gap-2">
+        {/* Row 2: Page navigation — compact on mobile */}
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
           <button
             onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
             disabled={currentPage <= 1}
-            className="p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            className="p-1.5 sm:p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             aria-label="Previous page"
             id="pdf-prev-page"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm text-gray-400 w-24 text-center">
-            {currentPage} / {totalPages}
-          </span>
+
+          {/* Page number input */}
+          <form onSubmit={handlePageInput} className="flex items-center gap-1.5">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={pageInputValue}
+              onChange={(e) => setPageInputValue(e.target.value)}
+              onBlur={handlePageInput}
+              className="w-10 sm:w-12 text-center text-sm text-white bg-dark-800 border border-white/10 rounded-lg py-1 px-1 focus:border-primary-500/50 outline-none transition-colors"
+              aria-label="Go to page"
+              id="pdf-page-input"
+            />
+            <span className="text-xs sm:text-sm text-gray-500">/ {totalPages}</span>
+          </form>
+
           <button
             onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
             disabled={currentPage >= totalPages}
-            className="p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            className="p-1.5 sm:p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             aria-label="Next page"
             id="pdf-next-page"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setScale((s) => Math.max(s - 0.2, 0.6))}
-            className="p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
-            aria-label="Zoom out"
-            id="pdf-zoom-out"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <span className="text-xs text-gray-500 w-12 text-center">
-            {Math.round(scale * 100)}%
-          </span>
-          <button
-            onClick={() => setScale((s) => Math.min(s + 0.2, 3.0))}
-            className="p-2 rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-white/20 transition-all"
-            aria-label="Zoom in"
-            id="pdf-zoom-in"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       {/* Dev-tools blur overlay */}
       {devToolsOpen && (
-        <div className="fixed inset-0 z-50 backdrop-blur-2xl bg-dark-950/90 flex items-center justify-center">
-          <div className="glass border border-red-500/20 rounded-3xl p-8 text-center max-w-sm">
-            <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white mb-2">
+        <div className="fixed inset-0 z-50 backdrop-blur-2xl bg-dark-950/90 flex items-center justify-center p-4">
+          <div className="glass border border-red-500/20 rounded-3xl p-6 sm:p-8 text-center max-w-sm">
+            <AlertTriangle className="w-10 h-10 sm:w-12 sm:h-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold text-white mb-2">
               Developer Tools Detected
             </h3>
-            <p className="text-sm text-gray-400">
+            <p className="text-xs sm:text-sm text-gray-400">
               Please close developer tools to continue reading.
             </p>
           </div>
         </div>
       )}
 
-      {/* Canvas */}
-      <div className="flex-1 flex items-start justify-center py-8 px-4 overflow-auto">
+      {/* Canvas — scrollable area */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 flex items-start justify-center py-4 sm:py-8 px-2 sm:px-4 overflow-auto"
+      >
         <div className="relative shadow-card rounded-lg overflow-hidden">
           <canvas
             ref={canvasRef}
-            className="block max-w-full"
+            className="block"
+            style={{ maxWidth: scale <= fitScale ? "100%" : "none" }}
             aria-label={`PDF page ${currentPage} of ${totalPages}`}
           />
         </div>
       </div>
 
-      {/* Bottom info bar */}
-      <div className="glass border-t border-white/5 px-4 py-2 text-center text-xs text-gray-600">
-        Viewing as {userEmail} — Content is watermarked and protected
+      {/* Bottom info bar — responsive */}
+      <div className="glass border-t border-white/5 px-3 sm:px-4 py-1.5 sm:py-2 text-center">
+        <p className="text-[10px] sm:text-xs text-gray-600 truncate">
+          Viewing as <span className="text-gray-500">{userEmail}</span> — Content is watermarked and protected
+        </p>
+        <p className="text-[9px] sm:hidden text-gray-700 mt-0.5">
+          Swipe left/right to change pages
+        </p>
       </div>
     </div>
   );

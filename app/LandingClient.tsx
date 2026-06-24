@@ -92,7 +92,7 @@ export default function LandingClient() {
         className="pt-28 pb-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
       >
         <div className="mb-10">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
             Premium Content
           </h2>
           <p className="text-gray-400">

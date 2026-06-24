@@ -189,17 +189,17 @@ export default function AdminProductsPage() {
     <div className="flex min-h-screen bg-dark-950">
       <AdminSidebar />
 
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 p-4 pt-14 sm:p-6 lg:p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-white">Products</h1>
-              <p className="text-gray-400 mt-1">Manage your note catalog</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">Products</h1>
+              <p className="text-gray-400 mt-1 text-sm sm:text-base">Manage your note catalog</p>
             </div>
             <button
               onClick={() => setShowForm(true)}
-              className="btn-primary flex items-center gap-2"
+              className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
               id="add-product-btn"
             >
               <Plus className="w-4 h-4" />
@@ -248,7 +248,7 @@ export default function AdminProductsPage() {
                     </div>
 
                     {/* Subject + Branch */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1.5">Subject *</label>
                         <select
@@ -282,7 +282,7 @@ export default function AdminProductsPage() {
                     </div>
 
                     {/* Semester + Price + Page Count */}
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1.5">Semester *</label>
                         <select
@@ -454,7 +454,7 @@ export default function AdminProductsPage() {
                 {products.map((product) => (
                   <div
                     key={product.id}
-                    className="flex items-center gap-4 px-6 py-4 hover:bg-white/2 transition-colors"
+                    className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 hover:bg-white/2 transition-colors"
                   >
                     {/* Cover */}
                     <div className="w-12 h-12 rounded-xl overflow-hidden bg-dark-700 flex-shrink-0">
@@ -474,14 +474,14 @@ export default function AdminProductsPage() {
                     </div>
 
                     {/* Info */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 w-full sm:w-auto">
                       <p className="text-sm font-medium text-white truncate">{product.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mt-0.5">
                         <span className="text-xs text-gray-500">{product.subject}</span>
-                        <span className="text-gray-700">·</span>
+                        <span className="text-gray-700 hidden sm:inline">·</span>
                         <span className="text-xs text-gray-500">Sem {product.semester}</span>
-                        <span className="text-gray-700">·</span>
-                        <span className="text-xs text-gray-500">{product.branch}</span>
+                        <span className="text-gray-700 hidden sm:inline">·</span>
+                        <span className="text-xs text-gray-500 hidden sm:inline">{product.branch}</span>
                       </div>
                     </div>
 

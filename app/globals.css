@@ -344,3 +344,57 @@ select.input option {
 .animate-float { animation: float 6s ease-in-out infinite; }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 .animate-pulse-slow { animation: pulse 3s ease-in-out infinite; }
+
+/* ============================================================
+   Mobile Sidebar Slide Animation
+   ============================================================ */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.25s ease-out forwards;
+}
+
+/* ============================================================
+   Responsive Overrides
+   ============================================================ */
+
+/* Admin pages — smaller padding on mobile */
+@media (max-width: 640px) {
+  .admin-main-content {
+    padding: 1rem;
+    padding-top: 3.5rem; /* space for mobile hamburger toggle */
+  }
+}
+
+/* Card grid — ensure no horizontal overflow */
+@media (max-width: 480px) {
+  .card {
+    border-radius: 0.75rem;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    font-size: 0.85rem;
+    padding: 0.625rem 1.25rem;
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.5rem;
+  }
+}
+
+/* PDF viewer — prevent canvas overflow on mobile */
+@media (max-width: 640px) {
+  .pdf-viewer-container canvas {
+    max-width: 100%;
+  }
+}
+
+/* Fix overflow from background decorations */
+.hero-mesh {
+  overflow: hidden;
+}

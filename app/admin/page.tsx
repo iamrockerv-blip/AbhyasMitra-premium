@@ -133,7 +133,7 @@ export default function AdminDashboard() {
     <div className="flex min-h-screen bg-dark-950">
       <AdminSidebar />
 
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 p-4 pt-14 sm:p-6 lg:p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8">
