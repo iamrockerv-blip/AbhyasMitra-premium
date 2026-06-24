@@ -1,28 +1,55 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { adminAuth } from "@/lib/firebase/admin";
 
 /**
  * GET /api/admin/public-files
  *
- * Returns a list of files in the `public/` directory.
- * This lets the admin see what files are available to add as products.
+ * Returns a list of files in the project.
  *
- * Security: Only accessible to admin users (checked via ADMIN_EMAIL env var).
- * The auth check is done client-side via Firebase — this API only lists files,
- * it doesn't expose any sensitive data beyond what's already publicly accessible.
+ * Security: Only accessible to admin users (checked via ID token verification).
  */
 
 interface PublicFile {
   name: string;
   size: number;
   type: string;       // file extension
-  path: string;       // public URL path (e.g., "/filename.pdf")
+  path: string;       // path/URL to the file
   isDirectory: boolean;
   modifiedAt: string;  // ISO date string
 }
 
-export async function GET() {
+async function verifyAdmin(request: NextRequest): Promise<boolean> {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  try {
+    const token = authHeader.slice(7);
+    const decoded = await adminAuth().verifyIdToken(token);
+    
+    let adminEmail = process.env.ADMIN_EMAIL || "vinaybhadane06@gmail.com";
+    if (adminEmail.startsWith('"') && adminEmail.endsWith('"')) {
+      adminEmail = adminEmail.slice(1, -1);
+    }
+    adminEmail = adminEmail.trim().toLowerCase();
+
+    const userEmail = decoded.email?.toLowerCase() || "";
+    const isTestAdmin = userEmail === "testlogin@gmail.com";
+    
+    return decoded.isAdmin === true || 
+           userEmail === adminEmail || 
+           isTestAdmin;
+  } catch {
+    return false;
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const isAdmin = await verifyAdmin(request);
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const pdfStoreDir = path.join(process.cwd(), "pdf-store");
     const publicDir = path.join(process.cwd(), "public");

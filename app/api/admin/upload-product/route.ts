@@ -15,10 +15,16 @@ async function verifyAdmin(request: NextRequest): Promise<string | null> {
   try {
     const token = authHeader.slice(7);
     const decoded = await adminAuth().verifyIdToken(token);
-    const adminEmail = process.env.ADMIN_EMAIL || "vinaybhadane06@gmail.com";
-    const isTestAdmin = decoded.email?.toLowerCase() === "testlogin@gmail.com";
+    let adminEmail = process.env.ADMIN_EMAIL || "vinaybhadane06@gmail.com";
+    if (adminEmail.startsWith('"') && adminEmail.endsWith('"')) {
+      adminEmail = adminEmail.slice(1, -1);
+    }
+    adminEmail = adminEmail.trim().toLowerCase();
+
+    const userEmail = decoded.email?.toLowerCase() || "";
+    const isTestAdmin = userEmail === "testlogin@gmail.com";
     const isAdmin = decoded.isAdmin === true || 
-                    decoded.email?.toLowerCase() === adminEmail.toLowerCase() || 
+                    userEmail === adminEmail || 
                     isTestAdmin;
     return isAdmin ? decoded.uid : null;
   } catch {

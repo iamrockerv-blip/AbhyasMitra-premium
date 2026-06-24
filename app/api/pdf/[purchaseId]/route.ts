@@ -15,6 +15,34 @@ import { adminAuth, adminDb, adminStorage } from "@/lib/firebase/admin";
 export const dynamic = "force-dynamic";
 
 /**
+ * Normalizes a filename to retrieve the pure filename without path prefixes.
+ * Handles cases where database paths have leading slashes, "public/", or "pdf-store/".
+ */
+function normalizeFileName(fileName: string): string {
+  let name = fileName || "";
+  // Strip leading slashes/backslashes
+  while (name.startsWith("/") || name.startsWith("\\")) {
+    name = name.slice(1);
+  }
+  // Strip prefixes (case-insensitive check)
+  if (name.toLowerCase().startsWith("public/")) {
+    name = name.slice(7);
+  } else if (name.toLowerCase().startsWith("public\\")) {
+    name = name.slice(7);
+  }
+  if (name.toLowerCase().startsWith("pdf-store/")) {
+    name = name.slice(10);
+  } else if (name.toLowerCase().startsWith("pdf-store\\")) {
+    name = name.slice(10);
+  }
+  // Strip leading slashes/backslashes again if they existed after prefix
+  while (name.startsWith("/") || name.startsWith("\\")) {
+    name = name.slice(1);
+  }
+  return name;
+}
+
+/**
  * Fetch a file from the public/ folder by making an HTTP request
  * to the app's own origin. This works on Vercel where serverless functions
  * can't read from the public/ directory via the filesystem.
@@ -24,9 +52,10 @@ async function fetchFromPublicFolder(
   request: NextRequest
 ): Promise<Buffer | null> {
   try {
+    const cleanName = normalizeFileName(fileName);
     // Build the URL from the incoming request's origin
     const origin = request.nextUrl.origin;
-    const fileUrl = `${origin}/${encodeURIComponent(fileName)}`;
+    const fileUrl = `${origin}/${encodeURIComponent(cleanName)}`;
     console.log("[pdf] Fetching from public folder via URL:", fileUrl);
 
     const res = await fetch(fileUrl, {
@@ -60,9 +89,10 @@ function readFromLocalFs(fileName: string): Buffer | null {
   try {
     const fs = require("fs");
     const path = require("path");
+    const cleanName = normalizeFileName(fileName);
     
     // First, try secure pdf-store directory
-    const securePath = path.join(process.cwd(), "pdf-store", fileName);
+    const securePath = path.join(process.cwd(), "pdf-store", cleanName);
     console.log("[pdf] Attempting local secure fs read from:", securePath);
     if (fs.existsSync(securePath)) {
       const data = fs.readFileSync(securePath);
@@ -71,7 +101,7 @@ function readFromLocalFs(fileName: string): Buffer | null {
     }
     
     // Fallback: try public folder (backward compatibility)
-    const publicPath = path.join(process.cwd(), "public", fileName);
+    const publicPath = path.join(process.cwd(), "public", cleanName);
     console.log("[pdf] secure path failed. Attempting fallback local public fs read from:", publicPath);
     if (fs.existsSync(publicPath)) {
       const data = fs.readFileSync(publicPath);
@@ -79,7 +109,7 @@ function readFromLocalFs(fileName: string): Buffer | null {
       return data;
     }
     
-    console.warn("[pdf] File does not exist in local secure path or public fallback:", fileName);
+    console.warn("[pdf] File does not exist in local secure path or public fallback:", cleanName);
     return null;
   } catch (err: any) {
     console.error("[pdf] Local fs read failed with error:", err);

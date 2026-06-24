@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect } from "react";
 import { collection, getDocs, addDoc, query, orderBy } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase/client";
+import { onAuthStateChanged } from "firebase/auth";
 import AdminSidebar from "@/components/AdminSidebar";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -97,12 +98,18 @@ export default function AdminFilesPage() {
   // Fetch files from public folder
   const fetchFiles = async () => {
     try {
-      const res = await fetch("/api/admin/public-files");
+      const user = auth.currentUser;
+      if (!user) return;
+      const idToken = await user.getIdToken();
+
+      const res = await fetch("/api/admin/public-files", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       if (!res.ok) throw new Error("Failed to fetch files");
       const data = await res.json();
       setFiles(data.files || []);
     } catch (err) {
-      toast.error("Failed to load public files");
+      toast.error("Failed to load project files");
       console.error(err);
     }
   };
@@ -122,9 +129,16 @@ export default function AdminFilesPage() {
   };
 
   useEffect(() => {
-    Promise.all([fetchFiles(), fetchProducts()]).finally(() =>
-      setLoading(false)
-    );
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        Promise.all([fetchFiles(), fetchProducts()]).finally(() =>
+          setLoading(false)
+        );
+      } else {
+        setLoading(false);
+      }
+    });
+    return unsub;
   }, []);
 
   const handleRefresh = async () => {

@@ -1,5 +1,5 @@
 /**
- * Next.js Middleware — Admin Route Protection
+ * Next.js Middleware/Proxy — Admin Route Protection
  *
  * Protects /admin/* routes at the edge layer.
  * Reads the admin session cookie for a quick check.
@@ -8,7 +8,7 @@
  * Note: Firebase Auth tokens can't be verified at the Edge without the Admin SDK
  * (which uses Node.js APIs). We use a lightweight session cookie strategy:
  * - On admin login, we set a `admin_session` cookie with the ID token
- * - Middleware checks for this cookie's presence (not its validity — that's done in API routes)
+ * - Middleware/Proxy checks for this cookie's presence (not its validity — that's done in API routes)
  * - If cookie is absent, redirect to /admin/login
  */
 import { NextRequest, NextResponse } from "next/server";

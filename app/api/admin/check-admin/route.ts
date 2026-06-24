@@ -17,9 +17,15 @@ export async function GET(request: NextRequest) {
     const token = authHeader.slice(7);
     const decoded = await adminAuth().verifyIdToken(token);
 
-    const adminEmail = process.env.ADMIN_EMAIL || "vinaybhadane06@gmail.com";
-    const isTestAdmin = decoded.email?.toLowerCase() === "testlogin@gmail.com";
-    const isAdminByEmail = (decoded.email?.toLowerCase() === adminEmail.toLowerCase()) || isTestAdmin;
+    let adminEmail = process.env.ADMIN_EMAIL || "vinaybhadane06@gmail.com";
+    if (adminEmail.startsWith('"') && adminEmail.endsWith('"')) {
+      adminEmail = adminEmail.slice(1, -1);
+    }
+    adminEmail = adminEmail.trim().toLowerCase();
+
+    const userEmail = decoded.email?.toLowerCase() || "";
+    const isTestAdmin = userEmail === "testlogin@gmail.com";
+    const isAdminByEmail = (userEmail === adminEmail) || isTestAdmin;
     const isAdminByClaim = decoded.isAdmin === true;
     const isAdmin = isAdminByEmail || isAdminByClaim;
 
