@@ -27,38 +27,51 @@ async function fetchFromPublicFolder(
     // Build the URL from the incoming request's origin
     const origin = request.nextUrl.origin;
     const fileUrl = `${origin}/${encodeURIComponent(fileName)}`;
+    console.log("[pdf] Fetching from public folder via URL:", fileUrl);
 
     const res = await fetch(fileUrl, {
-      // Don't follow redirects to error pages
       redirect: "manual",
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn("[pdf] Fetch from public folder status not ok:", res.status);
+      return null;
+    }
 
     const contentType = res.headers.get("content-type") || "";
     // Make sure we're actually getting a PDF, not an HTML error page
-    if (contentType.includes("text/html")) return null;
+    if (contentType.includes("text/html")) {
+      console.warn("[pdf] Fetch from public folder returned HTML instead of PDF. Content-Type:", contentType);
+      return null;
+    }
 
     const arrayBuffer = await res.arrayBuffer();
     return Buffer.from(arrayBuffer);
-  } catch {
+  } catch (err: any) {
+    console.error("[pdf] Fetch from public folder failed with error:", err);
     return null;
   }
 }
 
 /**
- * Try to read from local filesystem (works in dev, may work on some hosts)
+ * Try to read from local filesystem (works in dev, and on Vercel if bundled via outputFileTracingIncludes)
  */
 function readFromLocalFs(fileName: string): Buffer | null {
   try {
     const fs = require("fs");
     const path = require("path");
     const localPath = path.join(process.cwd(), "public", fileName);
+    console.log("[pdf] Attempting local fs read from:", localPath);
     if (fs.existsSync(localPath)) {
-      return fs.readFileSync(localPath);
+      const data = fs.readFileSync(localPath);
+      console.log("[pdf] Successfully read file from local fs:", localPath);
+      return data;
+    } else {
+      console.warn("[pdf] File does not exist on local fs:", localPath);
     }
     return null;
-  } catch {
+  } catch (err: any) {
+    console.error("[pdf] Local fs read failed with error:", err);
     return null;
   }
 }
@@ -69,10 +82,12 @@ export async function GET(
 ) {
   try {
     const { purchaseId } = await params;
+    console.log("[pdf] GET request received for purchaseId:", purchaseId);
 
     // ─── Auth check ───────────────────────────────────────────────────────
     const authHeader = request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      console.warn("[pdf] Authorization header missing or invalid format");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -80,7 +95,8 @@ export async function GET(
     let decoded;
     try {
       decoded = await adminAuth().verifyIdToken(token);
-    } catch {
+    } catch (authErr: any) {
+      console.error("[pdf] Auth verifyIdToken failed:", authErr.message);
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
@@ -90,17 +106,19 @@ export async function GET(
     const purchaseSnap = await adminDb().collection("purchases").doc(purchaseId).get();
 
     if (!purchaseSnap.exists) {
+      console.warn("[pdf] Purchase not found in database:", purchaseId);
       return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
     }
 
     const purchase = purchaseSnap.data()!;
 
     if (purchase.userId !== userId) {
-      console.warn("[pdf] Unauthorized access attempt", { requestUserId: userId, purchaseId });
+      console.warn("[pdf] Unauthorized access attempt", { requestUserId: userId, purchaseOwnerId: purchase.userId, purchaseId });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (purchase.status !== "completed") {
+      console.warn("[pdf] Purchase is not in completed status:", purchase.status);
       return NextResponse.json({ error: "Purchase not completed" }, { status: 403 });
     }
 
@@ -116,14 +134,18 @@ export async function GET(
       const productSnap = await adminDb().collection("products").doc(purchase.productId).get();
 
       if (!productSnap.exists) {
+        console.warn("[pdf] Product not found for purchase:", purchase.productId);
         return NextResponse.json({ error: "Product not found" }, { status: 404 });
       }
 
       storagePath = productSnap.data()!.storagePath;
       if (!storagePath) {
+        console.warn("[pdf] Product does not have a storagePath defined:", purchase.productId);
         return NextResponse.json({ error: "PDF not available" }, { status: 404 });
       }
     }
+
+    console.log("[pdf] Resolved storage path to attempt loading:", storagePath);
 
     // Strategy 1: Try Firebase Storage first (for files uploaded via admin panel)
     try {
@@ -135,25 +157,26 @@ export async function GET(
         const [downloaded] = await file.download();
         fileContents = downloaded;
         console.log("[pdf] Served from Firebase Storage:", storagePath);
+      } else {
+        console.log("[pdf] File does not exist in Firebase Storage bucket:", storagePath);
       }
     } catch (err: any) {
       console.warn("[pdf] Firebase Storage attempt failed:", err.message);
     }
 
-    // Strategy 2: Try fetching from public/ folder via HTTP
-    // (works on Vercel where files in public/ are served by CDN)
-    if (!fileContents) {
-      fileContents = await fetchFromPublicFolder(storagePath, request);
-      if (fileContents) {
-        console.log("[pdf] Served from public/ folder via HTTP:", storagePath);
-      }
-    }
-
-    // Strategy 3: Try local filesystem (dev environment fallback)
+    // Strategy 2: Try local filesystem (works in dev and on Vercel if bundled via outputFileTracingIncludes)
     if (!fileContents) {
       fileContents = readFromLocalFs(storagePath);
       if (fileContents) {
         console.log("[pdf] Served from local filesystem:", storagePath);
+      }
+    }
+
+    // Strategy 3: Try fetching from public/ folder via HTTP (last resort fallback)
+    if (!fileContents) {
+      fileContents = await fetchFromPublicFolder(storagePath, request);
+      if (fileContents) {
+        console.log("[pdf] Served from public/ folder via HTTP:", storagePath);
       }
     }
 
@@ -175,7 +198,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("[pdf] Error:", error);
+    console.error("[pdf] Internal server error in PDF API route:", error);
     return NextResponse.json({ error: "Failed to load document" }, { status: 500 });
   }
 }

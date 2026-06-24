@@ -14,16 +14,40 @@ function getAdminApp(): App {
   const existingApps = getApps();
   if (existingApps.length > 0) return existingApps[0];
 
-  const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  let privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
+  if (privateKey) {
+    // Strip surrounding quotes if present (often pasted like this in Vercel dashboard)
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    // Replace escaped newlines
+    privateKey = privateKey.replace(/\\n/g, "\n");
+  }
 
-  return initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID || "",
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL || "",
-      privateKey: privateKey || "",
-    }),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  });
+  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID || "";
+  const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL || "";
+
+  if (!projectId || !clientEmail || !privateKey) {
+    console.error("[firebase-admin] Missing credentials:", {
+      hasProjectId: !!projectId,
+      hasClientEmail: !!clientEmail,
+      hasPrivateKey: !!privateKey,
+    });
+  }
+
+  try {
+    return initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey: privateKey || "",
+      }),
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    });
+  } catch (error) {
+    console.error("[firebase-admin] Initialization failed:", error);
+    throw error;
+  }
 }
 
 export function getAdminDb(): Firestore {

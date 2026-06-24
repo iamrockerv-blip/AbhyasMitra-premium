@@ -17,6 +17,10 @@ const nextConfig: NextConfig = {
   },
   // Ensure server-only Firebase Admin modules aren't bundled for client
   serverExternalPackages: ["firebase-admin"],
+  // Bundle the public folder files with the PDF API route on Vercel
+  outputFileTracingIncludes: {
+    "/api/pdf/[purchaseId]": ["./public/**/*"],
+  },
 };
 
 export default nextConfig;
