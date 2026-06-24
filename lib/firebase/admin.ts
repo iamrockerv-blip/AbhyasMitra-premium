@@ -16,10 +16,15 @@ function getAdminApp(): App {
 
   let privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
   if (privateKey) {
+    privateKey = privateKey.trim();
     // Strip surrounding quotes if present (often pasted like this in Vercel dashboard)
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+    if (
+      (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+      (privateKey.startsWith("'") && privateKey.endsWith("'"))
+    ) {
       privateKey = privateKey.slice(1, -1);
     }
+    privateKey = privateKey.trim();
     // Replace escaped newlines
     privateKey = privateKey.replace(/\\n/g, "\n");
   }
