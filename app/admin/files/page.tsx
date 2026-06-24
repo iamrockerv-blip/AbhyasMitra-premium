@@ -244,7 +244,7 @@ export default function AdminFilesPage() {
                 File Manager
               </h1>
               <p className="text-gray-400 mt-1 text-sm sm:text-base">
-                Manage files from the public folder &amp; add them as products
+                Manage files from pdf-store &amp; public folders and add them as products
               </p>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -351,8 +351,8 @@ export default function AdminFilesPage() {
               <h3 className="text-lg font-semibold text-gray-400 mb-2">
                 No files found
               </h3>
-              <p className="text-gray-600 mb-2 max-w-sm text-sm">
-                Add files to the <code className="text-primary-400">public/</code> folder in your GitHub repository, then refresh.
+              <p className="text-gray-600 mb-2 max-w-md text-sm px-4">
+                Add PDF files to the <code className="text-primary-400">pdf-store/</code> folder and cover images to the <code className="text-primary-400">public/</code> folder in your GitHub repository, then refresh.
               </p>
             </div>
           ) : (
@@ -417,10 +417,10 @@ export default function AdminFilesPage() {
               <div className="glass border border-white/8 rounded-2xl overflow-hidden">
                 <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5">
                   <h2 className="text-base sm:text-lg font-semibold text-white">
-                    All Public Files
+                    All Local Files
                   </h2>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Files in your project&apos;s <code className="text-primary-400/80">public/</code> folder
+                    PDFs inside <code className="text-primary-400/80">pdf-store/</code> and cover images inside <code className="text-primary-400/80">public/</code>
                   </p>
                 </div>
                 <div className="divide-y divide-white/5">

@@ -60,15 +60,26 @@ function readFromLocalFs(fileName: string): Buffer | null {
   try {
     const fs = require("fs");
     const path = require("path");
-    const localPath = path.join(process.cwd(), "public", fileName);
-    console.log("[pdf] Attempting local fs read from:", localPath);
-    if (fs.existsSync(localPath)) {
-      const data = fs.readFileSync(localPath);
-      console.log("[pdf] Successfully read file from local fs:", localPath);
+    
+    // First, try secure pdf-store directory
+    const securePath = path.join(process.cwd(), "pdf-store", fileName);
+    console.log("[pdf] Attempting local secure fs read from:", securePath);
+    if (fs.existsSync(securePath)) {
+      const data = fs.readFileSync(securePath);
+      console.log("[pdf] Successfully read file from secure local fs:", securePath);
       return data;
-    } else {
-      console.warn("[pdf] File does not exist on local fs:", localPath);
     }
+    
+    // Fallback: try public folder (backward compatibility)
+    const publicPath = path.join(process.cwd(), "public", fileName);
+    console.log("[pdf] secure path failed. Attempting fallback local public fs read from:", publicPath);
+    if (fs.existsSync(publicPath)) {
+      const data = fs.readFileSync(publicPath);
+      console.log("[pdf] Successfully read file from fallback public fs:", publicPath);
+      return data;
+    }
+    
+    console.warn("[pdf] File does not exist in local secure path or public fallback:", fileName);
     return null;
   } catch (err: any) {
     console.error("[pdf] Local fs read failed with error:", err);

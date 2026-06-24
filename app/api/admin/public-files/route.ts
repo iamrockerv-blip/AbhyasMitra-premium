@@ -24,44 +24,60 @@ interface PublicFile {
 
 export async function GET() {
   try {
+    const pdfStoreDir = path.join(process.cwd(), "pdf-store");
     const publicDir = path.join(process.cwd(), "public");
 
-    if (!fs.existsSync(publicDir)) {
-      return NextResponse.json({ files: [] });
+    const files: PublicFile[] = [];
+
+    // Scan pdf-store directory (for private PDFs)
+    if (fs.existsSync(pdfStoreDir)) {
+      const entries = fs.readdirSync(pdfStoreDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() || entry.name.startsWith(".")) continue;
+        const filePath = path.join(pdfStoreDir, entry.name);
+        const stats = fs.statSync(filePath);
+        const ext = path.extname(entry.name).toLowerCase().replace(".", "");
+        if (ext === "pdf") {
+          files.push({
+            name: entry.name,
+            size: stats.size,
+            type: ext,
+            path: `/pdf-store/${entry.name}`,
+            isDirectory: false,
+            modifiedAt: stats.mtime.toISOString(),
+          });
+        }
+      }
     }
 
-    const entries = fs.readdirSync(publicDir, { withFileTypes: true });
-
-    const files: PublicFile[] = entries
-      .map((entry) => {
+    // Scan public directory (for cover images)
+    if (fs.existsSync(publicDir)) {
+      const entries = fs.readdirSync(publicDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() || entry.name.startsWith(".")) continue;
         const filePath = path.join(publicDir, entry.name);
         const stats = fs.statSync(filePath);
         const ext = path.extname(entry.name).toLowerCase().replace(".", "");
+        if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
+          files.push({
+            name: entry.name,
+            size: stats.size,
+            type: ext,
+            path: `/${entry.name}`,
+            isDirectory: false,
+            modifiedAt: stats.mtime.toISOString(),
+          });
+        }
+      }
+    }
 
-        return {
-          name: entry.name,
-          size: stats.size,
-          type: ext,
-          path: `/${entry.name}`,
-          isDirectory: entry.isDirectory(),
-          modifiedAt: stats.mtime.toISOString(),
-        };
-      })
-      // Filter out directories and common non-content files
-      .filter(
-        (f) =>
-          !f.isDirectory &&
-          !f.name.startsWith(".") &&
-          !["svg", "ico"].includes(f.type) &&
-          f.name !== "pdf.worker.min.mjs"
-      )
-      .sort((a, b) => a.name.localeCompare(b.name));
+    files.sort((a, b) => a.name.localeCompare(b.name));
 
     return NextResponse.json({ files });
   } catch (error) {
-    console.error("Error reading public directory:", error);
+    console.error("Error reading project directories:", error);
     return NextResponse.json(
-      { error: "Failed to read public directory" },
+      { error: "Failed to read project directories" },
       { status: 500 }
     );
   }
